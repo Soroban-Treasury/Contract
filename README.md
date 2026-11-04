@@ -2,8 +2,6 @@
 
 Policy-controlled team treasury on Soroban (Rust, `#![no_std]`). Part of Stellar Treasury.
 
-> **Unaudited. Testnet only.** This contract holds funds. Do not use it on mainnet.
-
 ## How it differs from other wallets
 
 - **Stellar-Agent-Guard** limits what an AI agent can spend. This contract is for **human teams**: several owners share one treasury and must agree before money moves.
@@ -73,6 +71,14 @@ stellar contract build      # needs stellar-cli v25.2.0+
 ```
 
 Tests cover the happy path, below-threshold, over-limit (single and cumulative), duplicate approval, non-owner calls, expired proposals, policy changes and bounds.
+
+## Security
+
+The contract holds funds, so treat it accordingly.
+
+- **Audit status:** not yet independently audited. An audit by a third-party security firm is the step before holding significant value on mainnet. This section will link the report once it exists.
+- **What is checked today:** the full test suite (including approval, limit, expiry and non-owner cases), clippy with warnings denied, bounded storage, checked arithmetic, and a live run on Stellar testnet.
+- **Report a vulnerability:** open a private security advisory on this repository.
 
 ## Not in the MVP
 
