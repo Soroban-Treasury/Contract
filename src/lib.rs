@@ -24,20 +24,18 @@ pub struct TreasuryContract;
 
 #[contractimpl]
 impl TreasuryContract {
-    /// Set up the treasury with its owners, approval threshold and starting spending limits.
-    /// Can only be called once.
+    /// Runs once, at deployment, in the same transaction that creates the contract. That leaves no
+    /// moment where someone else could initialize an empty treasury first.
     ///
-    /// Limits can be set here because changing them later needs `threshold` owners to authorize
-    /// in one call (see `set_spend_limit`). Assets without a limit cannot be spent.
-    pub fn initialize(
+    /// Sets the owners, the approval threshold and the starting spending limits. Limits are set
+    /// here because changing them later needs `threshold` owners to authorize in one call (see
+    /// `set_spend_limit`). Assets without a limit cannot be spent.
+    pub fn __constructor(
         env: Env,
         owners: Vec<Address>,
         threshold: u32,
         limits: Vec<LimitInit>,
     ) -> Result<(), Error> {
-        if env.storage().persistent().has(&DataKey::Config) {
-            return Err(Error::AlreadyInitialized);
-        }
         if owners.is_empty() {
             return Err(Error::InvalidOwners);
         }
@@ -282,6 +280,11 @@ impl TreasuryContract {
         }
         .publish(&env);
         Ok(())
+    }
+
+    /// Version of the contract code, for clients and deployment records.
+    pub fn contract_version(_env: Env) -> u32 {
+        CONTRACT_VERSION
     }
 
     // TODO(wave: contracts-1): recipient allowlist policy

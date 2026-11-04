@@ -1,5 +1,8 @@
 use soroban_sdk::{contracterror, contracttype, Address, Vec};
 
+/// Version of the contract code. Bump it when behaviour or storage changes.
+pub const CONTRACT_VERSION: u32 = 1;
+
 /// Maximum number of owners a treasury can have.
 pub const MAX_OWNERS: u32 = 10;
 /// Maximum number of assets that can have a spending-limit policy.
@@ -81,6 +84,7 @@ pub struct Proposal {
 #[derive(Copy, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 #[repr(u32)]
 pub enum Error {
+    /// Reserved. Setup now happens in the constructor, which can only run once.
     AlreadyInitialized = 1,
     NotInitialized = 2,
     InvalidThreshold = 3,
