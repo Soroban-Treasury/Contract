@@ -46,6 +46,15 @@ pub struct SpendLimit {
     pub period: u64,
 }
 
+/// A spending limit to set when the treasury is created.
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct LimitInit {
+    pub asset: Address,
+    pub limit: i128,
+    pub period: u64,
+}
+
 /// How much of an asset has been spent in the current period.
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

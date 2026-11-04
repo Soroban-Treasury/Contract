@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::{Error, TreasuryContract, TreasuryContractClient, MAX_OWNERS, MAX_POLICIES};
+use crate::{Error, LimitInit, TreasuryContract, TreasuryContractClient, MAX_OWNERS, MAX_POLICIES};
 use soroban_sdk::{
     testutils::{Address as _, Events as _, Ledger},
     token::{Client as TokenClient, StellarAssetClient},
@@ -37,7 +37,7 @@ fn setup(env: &Env) -> Setup<'_> {
         Address::generate(env),
         Address::generate(env),
     ];
-    client.initialize(&Vec::from_array(env, owners.clone()), &2);
+    client.initialize(&Vec::from_array(env, owners.clone()), &2, &Vec::new(env));
 
     let asset = new_asset(env);
     StellarAssetClient::new(env, &asset).mint(&treasury, &1_000_000);
@@ -87,9 +87,11 @@ fn initialize_stores_config() {
 fn initialize_twice_fails() {
     let env = Env::default();
     let s = setup(&env);
-    let res = s
-        .client
-        .try_initialize(&Vec::from_array(&env, s.owners.clone()), &2);
+    let res = s.client.try_initialize(
+        &Vec::from_array(&env, s.owners.clone()),
+        &2,
+        &Vec::new(&env),
+    );
     assert_eq!(res, Err(Ok(Error::AlreadyInitialized)));
 }
 
@@ -102,19 +104,19 @@ fn initialize_rejects_bad_input() {
     let new_client = || TreasuryContractClient::new(&env, &env.register(TreasuryContract, ()));
 
     assert_eq!(
-        new_client().try_initialize(&Vec::new(&env), &1),
+        new_client().try_initialize(&Vec::new(&env), &1, &Vec::new(&env)),
         Err(Ok(Error::InvalidOwners))
     );
     assert_eq!(
-        new_client().try_initialize(&vec![&env, a.clone(), b.clone()], &0),
+        new_client().try_initialize(&vec![&env, a.clone(), b.clone()], &0, &Vec::new(&env)),
         Err(Ok(Error::InvalidThreshold))
     );
     assert_eq!(
-        new_client().try_initialize(&vec![&env, a.clone(), b.clone()], &3),
+        new_client().try_initialize(&vec![&env, a.clone(), b.clone()], &3, &Vec::new(&env)),
         Err(Ok(Error::InvalidThreshold))
     );
     assert_eq!(
-        new_client().try_initialize(&vec![&env, a.clone(), a.clone()], &1),
+        new_client().try_initialize(&vec![&env, a.clone(), a.clone()], &1, &Vec::new(&env)),
         Err(Ok(Error::InvalidOwners))
     );
 
@@ -123,7 +125,7 @@ fn initialize_rejects_bad_input() {
         many.push_back(Address::generate(&env));
     }
     assert_eq!(
-        new_client().try_initialize(&many, &1),
+        new_client().try_initialize(&many, &1, &Vec::new(&env)),
         Err(Ok(Error::TooManyOwners))
     );
 }
@@ -432,4 +434,81 @@ fn state_changes_emit_events() {
     s.client.execute(&s.owners[0], &0);
     // `execute` emits the token transfer event and the treasury's own event.
     assert!(env.events().all().events().len() >= 2);
+}
+
+#[test]
+fn initialize_with_limits_lets_a_threshold_two_treasury_spend() {
+    let env = Env::default();
+    env.mock_all_auths();
+    env.ledger().with_mut(|l| l.timestamp = START);
+
+    let treasury = env.register(TreasuryContract, ());
+    let client = TreasuryContractClient::new(&env, &treasury);
+    let owners = [Address::generate(&env), Address::generate(&env)];
+    let asset = new_asset(&env);
+    StellarAssetClient::new(&env, &asset).mint(&treasury, &10_000);
+
+    client.initialize(
+        &Vec::from_array(&env, owners.clone()),
+        &2,
+        &vec![
+            &env,
+            LimitInit {
+                asset: asset.clone(),
+                limit: 500,
+                period: DAY,
+            },
+        ],
+    );
+    assert_eq!(client.get_spend_limit(&asset).limit, 500);
+    assert_eq!(client.get_policy_assets().len(), 1);
+
+    // No policy change needed: propose, approve, execute.
+    let to = Address::generate(&env);
+    let id = client.propose(&owners[0], &asset, &to, &300, &DAY);
+    client.approve(&owners[1], &id);
+    client.execute(&owners[0], &id);
+    assert_eq!(TokenClient::new(&env, &asset).balance(&to), 300);
+}
+
+#[test]
+fn initialize_rejects_bad_limits() {
+    let env = Env::default();
+    env.mock_all_auths();
+    let owner = Address::generate(&env);
+    let owners = vec![&env, owner];
+    let new_client = || TreasuryContractClient::new(&env, &env.register(TreasuryContract, ()));
+    let init = |asset: &Address, limit: i128, period: u64| LimitInit {
+        asset: asset.clone(),
+        limit,
+        period,
+    };
+    let asset = new_asset(&env);
+
+    assert_eq!(
+        new_client().try_initialize(&owners, &1, &vec![&env, init(&asset, 0, DAY)]),
+        Err(Ok(Error::InvalidPolicy))
+    );
+    assert_eq!(
+        new_client().try_initialize(&owners, &1, &vec![&env, init(&asset, 10, 0)]),
+        Err(Ok(Error::InvalidPolicy))
+    );
+    // Same asset twice.
+    assert_eq!(
+        new_client().try_initialize(
+            &owners,
+            &1,
+            &vec![&env, init(&asset, 10, DAY), init(&asset, 20, DAY)]
+        ),
+        Err(Ok(Error::InvalidPolicy))
+    );
+
+    let mut many = Vec::new(&env);
+    for _ in 0..=MAX_POLICIES {
+        many.push_back(init(&new_asset(&env), 10, DAY));
+    }
+    assert_eq!(
+        new_client().try_initialize(&owners, &1, &many),
+        Err(Ok(Error::TooManyPolicies))
+    );
 }

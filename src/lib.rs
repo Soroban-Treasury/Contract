@@ -24,8 +24,17 @@ pub struct TreasuryContract;
 
 #[contractimpl]
 impl TreasuryContract {
-    /// Set up the treasury. Can only be called once.
-    pub fn initialize(env: Env, owners: Vec<Address>, threshold: u32) -> Result<(), Error> {
+    /// Set up the treasury with its owners, approval threshold and starting spending limits.
+    /// Can only be called once.
+    ///
+    /// Limits can be set here because changing them later needs `threshold` owners to authorize
+    /// in one call (see `set_spend_limit`). Assets without a limit cannot be spent.
+    pub fn initialize(
+        env: Env,
+        owners: Vec<Address>,
+        threshold: u32,
+        limits: Vec<LimitInit>,
+    ) -> Result<(), Error> {
         if env.storage().persistent().has(&DataKey::Config) {
             return Err(Error::AlreadyInitialized);
         }
@@ -48,7 +57,15 @@ impl TreasuryContract {
         };
         put(&env, &DataKey::Config, &config);
         put(&env, &DataKey::ProposalCount, &0u64);
-        put(&env, &DataKey::PolicyAssets, &Vec::<Address>::new(&env));
+
+        let mut assets = Vec::<Address>::new(&env);
+        for init in limits.iter() {
+            if assets.contains(&init.asset) {
+                return Err(Error::InvalidPolicy);
+            }
+            apply_limit(&env, &mut assets, init.asset, init.limit, init.period)?;
+        }
+        put(&env, &DataKey::PolicyAssets, &assets);
 
         Initialized { owners, threshold }.publish(&env);
         Ok(())
@@ -66,30 +83,10 @@ impl TreasuryContract {
     ) -> Result<(), Error> {
         let config = load_config(&env)?;
         require_owner_approvals(&config, &approvers)?;
-        if limit <= 0 || period == 0 {
-            return Err(Error::InvalidPolicy);
-        }
 
         let mut assets = load_policy_assets(&env);
-        if !assets.contains(&asset) {
-            if assets.len() >= MAX_POLICIES {
-                return Err(Error::TooManyPolicies);
-            }
-            assets.push_back(asset.clone());
-            put(&env, &DataKey::PolicyAssets, &assets);
-        }
-        put(
-            &env,
-            &DataKey::Policy(asset.clone()),
-            &SpendLimit { limit, period },
-        );
-
-        LimitSet {
-            asset,
-            limit,
-            period,
-        }
-        .publish(&env);
+        apply_limit(&env, &mut assets, asset, limit, period)?;
+        put(&env, &DataKey::PolicyAssets, &assets);
         Ok(())
     }
 
@@ -330,6 +327,38 @@ impl TreasuryContract {
             None => 0,
         })
     }
+}
+
+/// Validate and store a limit, adding the asset to `assets` if it is new. Emits `LimitSet`.
+/// The caller saves `assets`.
+fn apply_limit(
+    env: &Env,
+    assets: &mut Vec<Address>,
+    asset: Address,
+    limit: i128,
+    period: u64,
+) -> Result<(), Error> {
+    if limit <= 0 || period == 0 {
+        return Err(Error::InvalidPolicy);
+    }
+    if !assets.contains(&asset) {
+        if assets.len() >= MAX_POLICIES {
+            return Err(Error::TooManyPolicies);
+        }
+        assets.push_back(asset.clone());
+    }
+    put(
+        env,
+        &DataKey::Policy(asset.clone()),
+        &SpendLimit { limit, period },
+    );
+    LimitSet {
+        asset,
+        limit,
+        period,
+    }
+    .publish(env);
+    Ok(())
 }
 
 fn has_duplicates(owners: &Vec<Address>) -> bool {

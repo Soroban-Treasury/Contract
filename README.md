@@ -20,7 +20,7 @@ propose  ->  approve (x N)  ->  execute
 2. Other owners call `approve(id)` until `threshold` owners have approved.
 3. An owner calls `execute(id)`. The treasury pays out only if the amount fits the asset's limit for the current period.
 
-Policies (spending limits) are changed with `set_spend_limit` / `remove_spend_limit`. These need `threshold` distinct owners to authorize in the same call.
+Spending limits are set when the treasury is created. They can be changed later with `set_spend_limit` / `remove_spend_limit`. These need `threshold` distinct owners to authorize in the same call, so set the limits you need at creation.
 
 The treasury is a normal contract that holds tokens. Execution is the contract transferring from its own address, so there is no `__check_auth` custom account in this MVP.
 
@@ -28,7 +28,7 @@ The treasury is a normal contract that holds tokens. Execution is the contract t
 
 | Function | Who | What |
 |---|---|---|
-| `initialize(owners, threshold)` | anyone, once | Set owners (1 to 10) and threshold |
+| `initialize(owners, threshold, limits)` | anyone, once | Set owners (1 to 10), threshold and starting spending limits (up to 10, one per asset) |
 | `set_spend_limit(approvers, asset, limit, period)` | threshold owners | Max `limit` per `period` seconds |
 | `remove_spend_limit(approvers, asset)` | threshold owners | Asset can no longer be spent |
 | `propose(proposer, asset, to, amount, ttl_secs)` | owner | Returns proposal id. TTL up to 30 days |
