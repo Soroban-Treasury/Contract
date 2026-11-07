@@ -13,6 +13,8 @@ NAME=treasury_contract
 OUT=target/wasm32v1-none/release
 
 stellar contract build
+# The deployed code hash comes from this extra optimize pass. Keep it until the code is redeployed:
+# `stellar contract build --optimize` alone gives a different file, and so a different hash.
 stellar contract optimize --wasm "$OUT/$NAME.wasm"
 
 WASM="$OUT/$NAME.optimized.wasm"

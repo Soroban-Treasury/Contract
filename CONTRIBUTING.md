@@ -2,11 +2,11 @@
 
 Thanks for helping. This is the contract repository of Stellar Treasury.
 
-> This repository is a read-only mirror. The work happens in the Soroban-Treasury monorepo, in the `contract/` folder, and is split into this repository on every push. Open pull requests against the monorepo.
+> Open pull requests here. Maintainers also work on this code in the `contract/` folder of the Soroban-Treasury monorepo, and the two are kept in sync automatically: changes merged here are pulled into the monorepo, and changes made there arrive here.
 
 ## Setup
 
-You need Rust (1.91 or newer) and, to build the wasm, [stellar-cli](https://developers.stellar.org/docs/tools/cli) 25.2 or newer.
+You need [rustup](https://rustup.rs) and, to build the wasm, [stellar-cli](https://developers.stellar.org/docs/tools/cli) 25.2 or newer. The Rust version is pinned in `rust-toolchain.toml`, and rustup installs it on first use. To reproduce the exact wasm hash, use stellar-cli 30.0.1, the version CI uses.
 
 ```
 cargo test

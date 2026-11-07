@@ -1,0 +1,6 @@
+# Pinned so that `sh scripts/build.sh` gives the same wasm, and the same hash, on every machine.
+# rustup installs this version on first use. Change it on purpose, and note the new wasm hash.
+[toolchain]
+channel = "1.99.0"
+targets = ["wasm32v1-none"]
+components = ["rustfmt", "clippy"]
