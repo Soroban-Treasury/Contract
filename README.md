@@ -2,6 +2,8 @@
 
 Policy-controlled team treasury on Soroban (Rust, `#![no_std]`). Part of Stellar Treasury.
 
+**[Live demo on testnet](https://soroban-treasury.github.io/Frontend/demo/)** · Stellar Treasury repos: [Contract](https://github.com/Soroban-Treasury/Contract) · [SDK](https://github.com/Soroban-Treasury/SDK) · [Backend](https://github.com/Soroban-Treasury/Backend) · [Frontend](https://github.com/Soroban-Treasury/Frontend)
+
 ## How it differs from other wallets
 
 - **Stellar-Agent-Guard** limits what an AI agent can spend. This contract is for **human teams**: several owners share one treasury and must agree before money moves.
